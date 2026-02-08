@@ -1,0 +1,7 @@
+{
+  "name": "KashArtsStudio",
+  "description": "Parent portal for KashArtsStudio students to track progress, syllabus, and daily activities.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
