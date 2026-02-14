@@ -1,13 +1,14 @@
 
-import { ClassLevel, SyllabusItem } from "./types";
 
-export const GALLERY_IMAGES = [
-  "https://picsum.photos/id/1015/800/600",
-  "https://picsum.photos/id/1016/800/600",
-  "https://picsum.photos/id/1018/800/600",
-  "https://picsum.photos/id/1019/800/600",
-  "https://picsum.photos/id/1025/800/600",
-  "https://picsum.photos/id/1040/800/600",
+import { ClassLevel, SyllabusItem, GalleryItem } from "./types";
+
+export const GALLERY_IMAGES: GalleryItem[] = [
+  { url: "https://picsum.photos/id/1015/800/600", title: "Valley Sunset", date: "May 2024" },
+  { url: "https://picsum.photos/id/1016/800/600", title: "Canyon Echoes", date: "April 2024" },
+  { url: "https://picsum.photos/id/1018/800/600", title: "Mountain High", date: "March 2024" },
+  { url: "https://picsum.photos/id/1019/800/600", title: "Ocean Breeze", date: "June 2024" },
+  { url: "https://picsum.photos/id/1025/800/600", title: "Winter Solstice", date: "December 2023" },
+  { url: "https://picsum.photos/id/1040/800/600", title: "Castle Dreams", date: "February 2024" },
 ];
 
 export const TESTIMONIALS = [
@@ -54,8 +55,8 @@ export const SYLLABUS_DATA: SyllabusItem[] = [
   },
   {
     level: ClassLevel.Seven,
-    title: "Masterpiece Creation",
-    description: "Complex compositions and mimicking master artists.",
-    modules: ["Advanced Composition", "Study of Van Gogh", "Canvas Painting", "Final Portfolio Prep"]
+    title: "Masterpiece & Reflection",
+    description: "Complex compositions, sharing 7-year experiences, and planning the next artistic journey.",
+    modules: ["Advanced Composition", "Canvas Painting", "Experience Sharing Session", "Future Roadmap & New Sessions"]
   }
 ];

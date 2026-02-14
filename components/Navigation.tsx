@@ -57,7 +57,9 @@ export const PortalNavigation: React.FC<PortalNavigationProps> = ({ activeTab, s
   const items = role === 'teacher' ? teacherNavItems : parentNavItems;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 pb-safe z-50">
+    <>
+    {/* Mobile Bottom Bar */}
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 pb-safe z-50">
       <div className="flex justify-around items-center h-16 max-w-md mx-auto">
         {items.map((item) => {
            const isActive = activeTab === item.id;
@@ -79,5 +81,34 @@ export const PortalNavigation: React.FC<PortalNavigationProps> = ({ activeTab, s
         })}
       </div>
     </div>
+
+    {/* Desktop Sidebar */}
+    <div className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-surface border-r border-primary/5 p-6 z-50">
+        <div className="mb-12">
+            <span className="font-serif text-2xl font-medium tracking-tight text-primary block">KASH ARTS.</span>
+            <span className="text-[9px] uppercase tracking-[0.3em] text-secondary">Portal</span>
+        </div>
+        
+        <div className="flex flex-col gap-2">
+             {items.map((item) => {
+                 const isActive = activeTab === item.id;
+                 return (
+                     <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`flex items-center gap-4 p-4 text-left transition-all rounded-sm ${isActive ? 'bg-primary text-white shadow-md' : 'text-secondary hover:bg-subtle'}`}
+                     >
+                         {item.icon}
+                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">{item.label}</span>
+                     </button>
+                 );
+             })}
+        </div>
+
+        <div className="mt-auto pt-6 border-t border-primary/5">
+             <p className="text-[9px] text-gray-300">© 2024 Institute</p>
+        </div>
+    </div>
+    </>
   );
 };

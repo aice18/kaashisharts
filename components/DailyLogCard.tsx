@@ -1,5 +1,8 @@
-import React from 'react';
+
+
+import React, { useState } from 'react';
 import { DailyLog } from '../types';
+import { Lightbox } from './Lightbox';
 
 interface DailyLogCardProps {
   log: DailyLog;
@@ -18,11 +21,18 @@ const getTextColor = (id: string) => {
   return colors[index];
 }
 
+const isVideo = (url: string) => {
+    return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.ogg') || url.startsWith('data:video');
+};
+
 export const DailyLogCard: React.FC<DailyLogCardProps> = ({ log }) => {
   const borderColor = getBorderColor(log.id);
   const textColor = getTextColor(log.id);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
 
   return (
+    <>
+    <Lightbox src={zoomImage} onClose={() => setZoomImage(null)} />
     <div className={`py-8 pl-8 border-l-4 ${borderColor} bg-surface shadow-sm mb-6`}>
       <div className="flex justify-between items-baseline mb-6">
         <h3 className="font-serif text-2xl text-primary">{log.date}</h3>
@@ -39,15 +49,28 @@ export const DailyLogCard: React.FC<DailyLogCardProps> = ({ log }) => {
             </div>
             
             {log.mediaUrls.length > 0 && (
-                <div className="flex gap-4 pt-2">
-                    {log.mediaUrls.map((url, idx) => (
-                        <img 
-                            key={idx} 
-                            src={url} 
-                            alt="Work" 
-                            className="w-20 h-20 object-cover grayscale hover:grayscale-0 transition-all cursor-pointer border border-primary/5 hover:border-primary/20"
-                        />
-                    ))}
+                <div className="flex flex-wrap gap-4 pt-2">
+                    {log.mediaUrls.map((url, idx) => {
+                        if (isVideo(url)) {
+                            return (
+                                <video 
+                                    key={idx}
+                                    src={url}
+                                    controls
+                                    className="w-40 h-40 object-cover border border-primary/5 rounded-sm"
+                                />
+                            );
+                        }
+                        return (
+                            <img 
+                                key={idx} 
+                                src={url} 
+                                alt="Work" 
+                                onClick={() => setZoomImage(url)}
+                                className="w-20 h-20 object-cover grayscale hover:grayscale-0 transition-all cursor-zoom-in border border-primary/5 hover:border-primary/20"
+                            />
+                        );
+                    })}
                 </div>
             )}
 
@@ -68,5 +91,6 @@ export const DailyLogCard: React.FC<DailyLogCardProps> = ({ log }) => {
             </div>
       </div>
     </div>
+    </>
   );
 };

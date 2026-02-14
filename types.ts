@@ -1,4 +1,5 @@
 
+
 export enum ClassLevel {
   One = 1,
   Two = 2,
@@ -9,7 +10,47 @@ export enum ClassLevel {
   Seven = 7
 }
 
-export type UserRole = 'guest' | 'parent' | 'teacher';
+export type UserRole = 'guest' | 'parent' | 'teacher' | 'admin';
+
+export interface Announcement {
+  id: string;
+  title: string;
+  date: string;
+  content: string;
+  priority: 'low' | 'high';
+  read?: boolean;
+  recipientId?: string; // Optional: If present, only visible to this user
+}
+
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: string; // ISO string
+  read: boolean;
+}
+
+export interface ClassSchedule {
+  day: string;
+  time: string;
+  subject: string;
+}
+
+export interface Artwork {
+  id: string;
+  studentId: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  date: string;
+}
+
+export interface GalleryItem {
+  url: string;
+  title: string;
+  date: string;
+}
 
 export interface Student {
   id: string;
@@ -20,6 +61,9 @@ export interface Student {
   admissionDate: string;
   currentLevel: ClassLevel;
   profileImage: string;
+  schedule: ClassSchedule[];
+  isOnline?: boolean;
+  lastSeen?: string;
 }
 
 export interface Teacher {
@@ -28,6 +72,8 @@ export interface Teacher {
   specialization: string;
   profileImage: string;
   upcomingClasses: number;
+  isOnline?: boolean;
+  lastSeen?: string;
 }
 
 export interface SyllabusItem {
