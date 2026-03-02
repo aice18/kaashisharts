@@ -195,6 +195,13 @@ if (typeof window !== 'undefined') {
      if (!teachers[randomTeacherIndex].isOnline) {
       teachers[randomTeacherIndex].lastSeen = new Date().toISOString();
     }
+
+    // Simulate messages being read
+    messages.forEach(m => {
+        if (!m.read && Math.random() > 0.7) {
+            m.read = true;
+        }
+    });
   }, 5000);
 }
 
@@ -247,17 +254,26 @@ export const Database = {
     ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   },
 
-  sendMessage: (senderId: string, receiverId: string, content: string) => {
+  sendMessage: (senderId: string, receiverId: string, content: string, attachment?: { type: 'image' | 'video', url: string }) => {
       const msg: DirectMessage = {
           id: `msg-${Date.now()}`,
           senderId,
           receiverId,
           content,
           timestamp: new Date().toISOString(),
-          read: false
+          read: false,
+          attachment
       };
       messages.push(msg);
       return msg;
+  },
+
+  markAsRead: (senderId: string, receiverId: string) => {
+      messages.forEach(m => {
+          if (m.senderId === senderId && m.receiverId === receiverId) {
+              m.read = true;
+          }
+      });
   },
 
   // Actions

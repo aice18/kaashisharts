@@ -180,14 +180,14 @@ export const PublicHeader: React.FC = () => {
 
       {/* Mobile Menu Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-surface z-40 animate-fade-in flex flex-col justify-center px-8">
-          <div className="space-y-12 text-center">
+        <div className="fixed inset-0 bg-white/95 backdrop-blur-xl z-40 animate-fade-in flex flex-col justify-center px-8">
+          <div className="space-y-8 text-center">
             {links.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
                 onClick={() => setIsOpen(false)}
-                className="block text-5xl font-serif text-primary hover:text-accent transition-colors italic"
+                className="block text-4xl md:text-5xl font-serif text-primary hover:text-cobalt transition-colors italic"
               >
                 {link.name}
               </Link>
@@ -195,16 +195,16 @@ export const PublicHeader: React.FC = () => {
              {installPrompt && (
               <button
                 onClick={() => { handleInstallClick(); setIsOpen(false); }}
-                className="block w-full text-center text-xl font-serif text-cobalt hover:text-primary transition-colors italic mt-4"
+                className="block w-full text-center text-xl font-serif text-cobalt hover:text-primary transition-colors italic mt-8"
               >
                 Install App
               </button>
             )}
-            <div className="pt-16 w-full flex justify-center">
+            <div className="pt-12 w-full flex justify-center">
                 <Link
                 to="/login"
                 onClick={() => setIsOpen(false)}
-                className="text-xs uppercase tracking-[0.3em] border-b border-primary pb-2 hover:text-accent transition-colors"
+                className="text-xs uppercase tracking-[0.3em] border-b border-primary pb-2 hover:text-cobalt hover:border-cobalt transition-colors"
                 >
                 Portal Access
                 </Link>

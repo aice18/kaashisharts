@@ -13,6 +13,11 @@ import { Student, SyllabusItem, UserRole, Teacher, DailyLog, Artwork, DirectMess
 import { Database } from './services/database';
 import { getArtisticAdvice } from './services/geminiService';
 import { Lightbox } from './components/Lightbox';
+import { HomePage } from './pages/HomePage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { TermsConditionsPage } from './pages/TermsConditionsPage';
+import { PublicLayout } from './layouts/PublicLayout';
+import { PortalLayout } from './layouts/PortalLayout';
 
 // --- Utility for Colors ---
 const PIGMENTS = ['text-cobalt', 'text-vermilion', 'text-ochre', 'text-viridian', 'text-violet'];
@@ -33,13 +38,7 @@ const formatLastSeen = (dateString?: string) => {
 
 // --- Shared Components ---
 
-const ScrollToTop = () => {
-    const { pathname } = useLocation();
-    useEffect(() => {
-        window.scrollTo(0, 0);
-    }, [pathname]);
-    return null;
-};
+
 
 const NotificationBell: React.FC<{ userId: string }> = ({ userId }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -162,6 +161,31 @@ const ChangePasswordModal: React.FC<{ isOpen: boolean, onClose: () => void, user
 
     if (!isOpen) return null;
 
+    const getStrength = (pass: string) => {
+        let score = 0;
+        if (!pass) return 0;
+        if (pass.length > 6) score += 1;
+        if (pass.length > 10) score += 1;
+        if (/[A-Z]/.test(pass)) score += 1;
+        if (/[0-9]/.test(pass)) score += 1;
+        if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+        return score;
+    }
+
+    const strength = getStrength(newPass);
+
+    const strengthColor = (score: number) => {
+        if (score < 2) return 'bg-vermilion';
+        if (score < 4) return 'bg-ochre';
+        return 'bg-viridian';
+    }
+
+    const strengthText = (score: number) => {
+        if (score < 2) return 'Weak';
+        if (score < 4) return 'Moderate';
+        return 'Strong';
+    }
+
     const handleSubmit = async () => {
         if (newPass !== confirmPass) {
             alert("Passwords do not match");
@@ -187,6 +211,17 @@ const ChangePasswordModal: React.FC<{ isOpen: boolean, onClose: () => void, user
                         onChange={e => setNewPass(e.target.value)}
                         className="w-full bg-white border border-primary/10 px-4 py-3 font-serif text-lg outline-none rounded-sm focus:border-cobalt transition-colors shadow-sm"
                     />
+                    {newPass && (
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="h-1 flex-1 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                    className={`h-full ${strengthColor(strength)} transition-all duration-300`} 
+                                    style={{ width: `${(strength / 5) * 100}%` }}
+                                ></div>
+                            </div>
+                            <span className="text-[9px] uppercase tracking-widest font-bold text-secondary">{strengthText(strength)}</span>
+                        </div>
+                    )}
                 </div>
                 <div className="space-y-2">
                     <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-secondary">Confirm Password</label>
@@ -345,6 +380,7 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
     const [messages, setMessages] = useState<DirectMessage[]>([]);
     const [inputText, setInputText] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [attachment, setAttachment] = useState<{ type: 'image' | 'video', url: string } | null>(null);
 
     const activeContact = contacts.find(c => c.id === selectedContactId);
 
@@ -361,7 +397,7 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
 
     // Effect to handle URL param changes
     useEffect(() => {
-        if (chatId) setSelectedContactId(chatId);
+        setSelectedContactId(chatId || null);
     }, [chatId]);
 
     // Polling for messages (Real-time simulation)
@@ -370,8 +406,14 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
 
         const fetchMessages = () => {
             const msgs = Database.getMessages(currentUser.id, activeContact.id);
+            
+            // Mark messages from activeContact as read
+            Database.markAsRead(activeContact.id, currentUser.id);
+
             setMessages(prev => {
-                if (prev.length !== msgs.length) return msgs;
+                // Check if any message status changed (e.g. read status)
+                const hasChanges = prev.length !== msgs.length || prev.some((m, i) => m.read !== msgs[i]?.read);
+                if (hasChanges) return [...msgs];
                 return prev;
             });
         };
@@ -387,21 +429,28 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages, activeContact]);
+    }, [messages.length, activeContact, attachment]);
 
     const handleSend = () => {
-        if (!inputText.trim() || !activeContact) return;
-        Database.sendMessage(currentUser.id, activeContact.id, inputText);
+        if ((!inputText.trim() && !attachment) || !activeContact) return;
+        
+        const msgContent = inputText.trim() || (attachment ? (attachment.type === 'image' ? '📷 Image' : '🎥 Video') : '');
+        
+        Database.sendMessage(currentUser.id, activeContact.id, msgContent, attachment || undefined);
+        
         // Optimistic update
         setMessages(prev => [...prev, {
             id: `temp-${Date.now()}`,
             senderId: currentUser.id,
             receiverId: activeContact.id,
-            content: inputText,
+            content: msgContent,
             timestamp: new Date().toISOString(),
-            read: false
+            read: false,
+            attachment: attachment || undefined
         }]);
+        
         setInputText('');
+        setAttachment(null);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -416,10 +465,24 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
         navigate(role === 'teacher' ? `/portal/teacher/messages/${id}` : `/portal/parent/messages/${id}`);
     };
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (ev.target?.result) {
+                    const type = file.type.startsWith('video') ? 'video' : 'image';
+                    setAttachment({ type, url: ev.target.result as string });
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const filteredContacts = contacts.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div className="flex h-[calc(100vh-140px)] bg-white border border-primary/10 shadow-xl rounded-sm overflow-hidden animate-fade-in mt-4">
+        <div className="flex h-full bg-white md:border-l border-primary/10 overflow-hidden animate-fade-in">
             
             {/* Sidebar / Contacts List */}
             <div className={`w-full md:w-1/3 border-r border-primary/10 flex flex-col ${selectedContactId ? 'hidden md:flex' : 'flex'}`}>
@@ -460,8 +523,19 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
                                         <h4 className="font-serif text-sm truncate text-primary">{contact.name}</h4>
                                         {lastMsg && <span className="text-[9px] text-secondary">{new Date(lastMsg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
                                     </div>
-                                    <p className="text-xs text-secondary truncate">
-                                        {lastMsg ? (lastMsg.senderId === currentUser.id ? `You: ${lastMsg.content}` : lastMsg.content) : <span className="italic opacity-50">Start a conversation</span>}
+                                    <p className="text-xs text-secondary truncate flex items-center gap-1">
+                                        {lastMsg ? (
+                                            <>
+                                                {lastMsg.senderId === currentUser.id && <span>You: </span>}
+                                                {lastMsg.attachment && (
+                                                    <span className="flex items-center gap-0.5">
+                                                        {lastMsg.attachment.type === 'image' ? '📷' : '🎥'} 
+                                                        {lastMsg.attachment.type === 'image' ? 'Image' : 'Video'}
+                                                    </span>
+                                                )}
+                                                {!lastMsg.attachment && lastMsg.content}
+                                            </>
+                                        ) : <span className="italic opacity-50">Start a conversation</span>}
                                     </p>
                                 </div>
                             </div>
@@ -496,15 +570,23 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
                         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                             {messages.map((msg, idx) => {
                                 const isMe = msg.senderId === currentUser.id;
-                                const showAvatar = !isMe && (idx === 0 || messages[idx-1].senderId !== msg.senderId);
                                 
                                 return (
                                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}>
-                                        <div className={`max-w-[85%] md:max-w-[70%] p-3 shadow-sm text-sm rounded-lg relative ${isMe ? 'bg-cobalt text-white rounded-tr-none' : 'bg-white text-primary rounded-tl-none'}`}>
-                                            {msg.content}
+                                        <div className={`max-w-[85%] md:max-w-[60%] p-2 shadow-sm text-sm rounded-lg relative ${isMe ? 'bg-cobalt text-white rounded-tr-none' : 'bg-white text-primary rounded-tl-none'}`}>
+                                            {msg.attachment && (
+                                                <div className="mb-2 rounded overflow-hidden">
+                                                    {msg.attachment.type === 'image' ? (
+                                                        <img src={msg.attachment.url} alt="Attachment" className="max-w-full h-auto max-h-64 object-cover" />
+                                                    ) : (
+                                                        <video src={msg.attachment.url} controls className="max-w-full h-auto max-h-64" />
+                                                    )}
+                                                </div>
+                                            )}
+                                            {msg.content && <p className="px-1">{msg.content}</p>}
                                             <div className={`text-[9px] mt-1 text-right opacity-70 flex items-center justify-end gap-1 ${isMe ? 'text-white' : 'text-secondary'}`}>
                                                 {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                                {isMe && <span>✓✓</span>}
+                                                {isMe && <span className={msg.read ? 'text-cyan-300 font-bold' : 'text-white/70'}>✓✓</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -521,30 +603,64 @@ const ChatPage: React.FC<{ currentUser: Student | Teacher, role: UserRole }> = (
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-3 bg-white border-t border-primary/5 flex gap-2 items-end">
-                             <textarea 
-                                className="flex-1 bg-subtle/50 rounded-lg border border-transparent focus:border-cobalt/30 outline-none p-3 text-sm resize-none max-h-32 min-h-[44px]"
-                                placeholder="Type a message..."
-                                rows={1}
-                                value={inputText}
-                                onChange={e => setInputText(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                            />
-                            <button 
-                                onClick={handleSend}
-                                disabled={!inputText.trim()}
-                                className="p-3 bg-cobalt text-white rounded-full hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 translate-x-0.5 -translate-y-0.5">
-                                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                                </svg>
-                            </button>
+                        <div className="p-3 bg-white border-t border-primary/5 flex flex-col gap-2">
+                            {attachment && (
+                                <div className="flex items-center gap-4 p-2 bg-subtle rounded-lg relative">
+                                    <button onClick={() => setAttachment(null)} className="absolute -top-2 -right-2 bg-vermilion text-white rounded-full p-1 shadow-md hover:scale-110 transition-transform">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                    <div className="w-16 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                                        {attachment.type === 'image' ? (
+                                            <img src={attachment.url} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-black text-white text-[8px]">VIDEO</div>
+                                        )}
+                                    </div>
+                                    <span className="text-xs text-secondary">Ready to send</span>
+                                </div>
+                            )}
+                            <div className="flex gap-2 items-end">
+                                <label className="p-3 text-secondary hover:text-primary cursor-pointer transition-colors">
+                                    <input type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                                    </svg>
+                                </label>
+                                <textarea 
+                                    className="flex-1 bg-subtle/50 rounded-lg border border-transparent focus:border-cobalt/30 outline-none p-3 text-sm resize-none max-h-32 min-h-[44px]"
+                                    placeholder="Type a message..."
+                                    rows={1}
+                                    value={inputText}
+                                    onChange={e => setInputText(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                />
+                                <button 
+                                    onClick={handleSend}
+                                    disabled={!inputText.trim() && !attachment}
+                                    className="p-3 bg-cobalt text-white rounded-full hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 translate-x-0.5 -translate-y-0.5">
+                                        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </>
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-secondary opacity-40">
+                    <div className="h-full flex flex-col items-center justify-center text-secondary opacity-40 select-none">
+                         <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-12 h-12 text-primary">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.186.078-2.1 1.051-2.1 2.238v.342m0 0a48.11 48.11 0 01-2.976 0c-1.135-.09-1.98-1.057-1.98-2.193v-4.286c0-.966.615-1.813 1.5-2.097a48.105 48.105 0 016.102-.94c.391-.049.78-.09 1.175-.118 1.175-.084 2.36-.125 3.55-.125 1.19 0 2.375.041 3.55.125.395.028.784.069 1.175.118a48.104 48.104 0 016.102.94z" />
+                            </svg>
+                         </div>
                          <h3 className="font-serif text-2xl mb-2 text-primary">KashArts Messenger</h3>
-                         <p className="text-sm">Select a contact to start chatting</p>
+                         <p className="text-sm font-light tracking-wide">Select a contact to start chatting</p>
+                         <div className="mt-8 flex gap-2 text-[10px] uppercase tracking-widest opacity-60">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full"></span> Online</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gray-400 rounded-full"></span> Offline</span>
+                         </div>
                     </div>
                 )}
             </div>
@@ -597,127 +713,7 @@ const FeesModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen,
     );
 };
 
-const HeroCarousel = () => {
-    const [index, setIndex] = useState(0);
-    const images = [
-        "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=1200&q=80",
-        "https://images.unsplash.com/photo-1596495577886-d920f1fb7238?w=1200&q=80",
-        "https://images.unsplash.com/photo-1501084817091-a4f3d1d19e07?w=1200&q=80"
-    ];
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setIndex(prev => (prev + 1) % images.length);
-        }, 4000);
-        return () => clearInterval(interval);
-    }, []);
-
-    return (
-        <div className="absolute inset-0 z-0">
-             {images.map((img, i) => (
-                 <div 
-                    key={i} 
-                    className={`absolute inset-0 transition-opacity duration-1000 ${i === index ? 'opacity-100' : 'opacity-0'}`}
-                 >
-                    <img src={img} className="w-full h-full object-cover" alt="Hero" />
-                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-[1px]"></div>
-                 </div>
-             ))}
-        </div>
-    );
-}
-
-// --- Layouts ---
-
-const PublicLayout = () => (
-    <div className="min-h-screen bg-background text-primary font-sans selection:bg-cobalt selection:text-white pb-20 md:pb-0">
-        <ScrollToTop />
-        <main>
-            <Outlet />
-        </main>
-    </div>
-);
-
-const PortalLayout: React.FC<{ role: UserRole }> = ({ role }) => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    
-    // Determine active tab from URL logic
-    let activeTab = 'dashboard';
-    if (location.pathname.includes('/teacher-home')) activeTab = 'teacher-home';
-    else if (location.pathname.includes('/students') || location.pathname.includes('/messages')) activeTab = 'students'; // Keep students active for chat
-    else if (location.pathname.includes('/add-log')) activeTab = 'add-log';
-    else if (location.pathname.includes('/profile') || location.pathname.includes('/teacher-profile')) activeTab = role === 'parent' ? 'profile' : 'teacher-profile';
-    else if (location.pathname.includes('/syllabus')) activeTab = 'syllabus';
-    else if (location.pathname.includes('/logs')) activeTab = 'logs';
-
-    const handleTabChange = (tab: string) => {
-        navigate(tab);
-    };
-
-    return (
-        <div className="min-h-screen bg-background flex flex-col md:flex-row">
-            <ScrollToTop />
-            <PortalNavigation activeTab={activeTab} setActiveTab={handleTabChange} role={role} />
-            <div className="flex-1 overflow-y-auto no-scrollbar px-6 md:px-12 py-8 pb-32 md:ml-64 max-w-[1920px]">
-                <Outlet />
-            </div>
-        </div>
-    );
-};
-
-// --- Simplified Public Pages ---
-
-const HomePage = () => {
-    const navigate = useNavigate();
-
-    return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-surface relative overflow-hidden text-center">
-        <HeroCarousel />
-        
-        {/* Color Strip */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cobalt via-vermilion to-ochre z-20"></div>
-
-        <div className="max-w-md w-full space-y-10 animate-fade-in z-10 bg-white/10 backdrop-blur-md p-8 rounded-lg border border-white/20 shadow-2xl">
-            <div className="space-y-3">
-                <h1 className="text-6xl font-serif text-white tracking-tight drop-shadow-md">KashArts.</h1>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-white/80">Studio Management Portal</p>
-            </div>
-
-            <div className="space-y-4">
-                <button 
-                    onClick={() => navigate('/login')} 
-                    className="w-full py-4 bg-white text-primary text-[11px] uppercase tracking-[0.2em] font-bold hover:bg-subtle transition-colors shadow-lg"
-                >
-                    Log In
-                </button>
-                <div className="grid grid-cols-2 gap-4">
-                     <button 
-                        onClick={() => navigate('/programs')} 
-                        className="py-4 border border-white/30 text-white text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-white/10 transition-colors backdrop-blur-sm"
-                     >
-                        Syllabus
-                     </button>
-                     <button 
-                        onClick={() => navigate('/gallery')} 
-                        className="py-4 border border-white/30 text-white text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-white/10 transition-colors backdrop-blur-sm"
-                     >
-                        Gallery
-                     </button>
-                </div>
-            </div>
-            
-            <button onClick={() => navigate('/contact')} className="text-[10px] uppercase tracking-[0.2em] text-white/70 hover:text-white transition-colors">
-                Contact & Inquiries
-            </button>
-        </div>
-        
-        <div className="absolute bottom-6 text-[9px] text-white/50 uppercase tracking-widest z-10">
-            © 2024 KashArts Studio
-        </div>
-    </div>
-    );
-};
 
 const ProgramsPage = () => {
     const navigate = useNavigate();
@@ -801,11 +797,11 @@ const ContactPage = () => {
         <div className="space-y-8 mb-12">
                 <div>
                 <span className="block text-[10px] uppercase tracking-[0.2em] text-viridian mb-2 font-bold">Studio Location</span>
-                <p className="text-lg font-light leading-relaxed">123 Art District, Creative Block,<br/>Metropolis, 400001</p>
+                <p className="text-lg font-light leading-relaxed">Mit Residency, Lane Number 3B, Kalyani Nagar,<br/>Pune, Maharashtra 411006</p>
                 </div>
                 <div>
                 <span className="block text-[10px] uppercase tracking-[0.2em] text-viridian mb-2 font-bold">Admissions</span>
-                <p className="text-lg font-light leading-relaxed">+91 98765 43210<br/>admissions@kasharts.com</p>
+                <p className="text-lg font-light leading-relaxed">+91 98817 21288<br/>contact@kashartss.com</p>
                 </div>
         </div>
 
@@ -1027,6 +1023,217 @@ const LogsView: React.FC<{ student: Student }> = ({ student }) => {
         </div>
     );
 }
+
+const PortalGalleryPage: React.FC<{ role: UserRole, studentId?: string }> = ({ role, studentId }) => {
+    const [artworks, setArtworks] = useState<Artwork[]>([]);
+    const [uploadForm, setUploadForm] = useState({
+        title: '',
+        description: '',
+        imageUrl: '',
+        studentId: studentId || ''
+    });
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [filterStudent, setFilterStudent] = useState<string>('all');
+    const [studentSearch, setStudentSearch] = useState('');
+
+    useEffect(() => {
+        if (role === 'parent' && studentId) {
+            setArtworks(Database.getArtworksForStudent(studentId));
+        } else if (role === 'teacher') {
+            const allStudents = Database.getAllStudents();
+            setStudents(allStudents);
+            const allArts = allStudents.flatMap(s => Database.getArtworksForStudent(s.id));
+            allArts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            setArtworks(allArts);
+        }
+    }, [role, studentId]);
+
+    const handleUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!uploadForm.title || !uploadForm.imageUrl || !uploadForm.studentId) return;
+
+        await Database.addArtwork({
+            title: uploadForm.title,
+            description: uploadForm.description,
+            imageUrl: uploadForm.imageUrl,
+            studentId: uploadForm.studentId
+        });
+        
+        setIsUploadOpen(false);
+        setUploadForm({ title: '', description: '', imageUrl: '', studentId: studentId || '' });
+        
+        if (role === 'teacher') {
+             const allStudents = Database.getAllStudents();
+             const allArts = allStudents.flatMap(s => Database.getArtworksForStudent(s.id));
+             allArts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+             setArtworks(allArts);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if(ev.target?.result) {
+                     setUploadForm(prev => ({...prev, imageUrl: ev.target!.result as string}));
+                }
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    const filteredArtworks = filterStudent === 'all' 
+        ? artworks 
+        : artworks.filter(a => a.studentId === filterStudent);
+
+    const filteredStudents = students.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()));
+
+    return (
+        <div className="space-y-8 animate-fade-in pt-4">
+            <div className="flex justify-between items-center border-b border-primary/5 pb-4">
+                <h1 className="text-2xl font-serif">Student Gallery</h1>
+                {role === 'teacher' && (
+                    <button 
+                        onClick={() => setIsUploadOpen(true)}
+                        className="bg-primary text-white px-4 py-2 text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-colors"
+                    >
+                        Upload Art
+                    </button>
+                )}
+            </div>
+
+            {role === 'teacher' && (
+                <div className="space-y-2">
+                    <div className="relative max-w-xs">
+                         <input 
+                            type="text" 
+                            placeholder="Filter students..." 
+                            className="w-full pl-8 pr-4 py-2 bg-white border border-primary/10 rounded-full text-xs outline-none focus:border-primary"
+                            value={studentSearch}
+                            onChange={e => setStudentSearch(e.target.value)}
+                        />
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3 absolute left-3 top-2.5 text-secondary">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                        <button 
+                            onClick={() => setFilterStudent('all')}
+                            className={`px-3 py-1 text-[10px] uppercase tracking-widest border rounded-full whitespace-nowrap transition-colors ${filterStudent === 'all' ? 'bg-primary text-white border-primary' : 'bg-white text-secondary border-primary/10 hover:border-primary'}`}
+                        >
+                            All Students
+                        </button>
+                        {filteredStudents.map(s => (
+                            <button 
+                                key={s.id}
+                                onClick={() => setFilterStudent(s.id)}
+                                className={`px-3 py-1 text-[10px] uppercase tracking-widest border rounded-full whitespace-nowrap transition-colors ${filterStudent === s.id ? 'bg-primary text-white border-primary' : 'bg-white text-secondary border-primary/10 hover:border-primary'}`}
+                            >
+                                {s.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredArtworks.map(art => (
+                    <div key={art.id} className="group relative bg-white border border-primary/5 shadow-sm hover:shadow-lg transition-all overflow-hidden">
+                        <div className="aspect-square overflow-hidden bg-gray-100">
+                            <img src={art.imageUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-serif text-lg">{art.title}</h3>
+                            <p className="text-xs text-secondary mt-1 line-clamp-2">{art.description}</p>
+                            <div className="flex justify-between items-center mt-4 pt-4 border-t border-primary/5">
+                                <span className="text-[9px] uppercase tracking-wider text-secondary">{art.date}</span>
+                                {role === 'teacher' && (
+                                    <span className="text-[9px] font-bold text-primary">
+                                        {students.find(s => s.id === art.studentId)?.name || art.studentId}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                {filteredArtworks.length === 0 && (
+                    <div className="col-span-full text-center py-12 text-secondary opacity-50">
+                        <p>No artworks found.</p>
+                    </div>
+                )}
+            </div>
+
+            <Modal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} title="Upload Artwork">
+                <form onSubmit={handleUpload} className="space-y-4">
+                    {role === 'teacher' && (
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest font-bold text-secondary mb-2">Student</label>
+                            <div className="relative">
+                                <select 
+                                    className="w-full p-2 border border-primary/10 rounded-sm text-sm outline-none focus:border-primary appearance-none bg-white"
+                                    value={uploadForm.studentId}
+                                    onChange={e => setUploadForm({...uploadForm, studentId: e.target.value})}
+                                    required
+                                >
+                                    <option value="">Select Student</option>
+                                    {students.sort((a,b) => a.name.localeCompare(b.name)).map(s => (
+                                        <option key={s.id} value={s.id}>{s.name} (ID: {s.id})</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-3 pointer-events-none text-secondary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-bold text-secondary mb-2">Title</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border border-primary/10 rounded-sm text-sm outline-none focus:border-primary"
+                            value={uploadForm.title}
+                            onChange={e => setUploadForm({...uploadForm, title: e.target.value})}
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-bold text-secondary mb-2">Description</label>
+                        <textarea 
+                            className="w-full p-2 border border-primary/10 rounded-sm text-sm outline-none focus:border-primary resize-none h-24"
+                            value={uploadForm.description}
+                            onChange={e => setUploadForm({...uploadForm, description: e.target.value})}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-bold text-secondary mb-2">Image</label>
+                        <div className="border-2 border-dashed border-primary/10 p-4 text-center rounded-sm hover:bg-subtle/50 transition-colors cursor-pointer relative">
+                            <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileSelect} required={!uploadForm.imageUrl} />
+                            {uploadForm.imageUrl ? (
+                                <img src={uploadForm.imageUrl} className="h-32 mx-auto object-contain" />
+                            ) : (
+                                <div className="text-secondary text-xs">
+                                    <span className="block text-2xl mb-2">+</span>
+                                    Click to upload image
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <button type="submit" className="w-full bg-primary text-white py-3 text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-colors mt-4">
+                        Upload to Gallery
+                    </button>
+                </form>
+            </Modal>
+        </div>
+    );
+};
 
 const ProfileView: React.FC<{ user: Student | Teacher, role: UserRole, onLogout: () => void, onUpdate: (u: Student|Teacher) => void }> = ({ user, role, onLogout, onUpdate }) => {
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -1288,11 +1495,6 @@ const TeacherAddLog: React.FC = () => {
                      )}
                  </div>
 
-                 <div>
-                     <label className="block text-[10px] uppercase tracking-widest font-bold text-secondary mb-2">Independent Study (Homework)</label>
-                     <input type="text" value={form.homework} onChange={e => setForm({...form, homework: e.target.value})} className="w-full p-2 border border-primary/10 rounded-sm" placeholder="Practice task..." />
-                 </div>
-
                  <button type="submit" className="w-full py-4 bg-primary text-white text-[11px] uppercase tracking-[0.2em] font-bold hover:bg-black transition-colors">
                      Save Log Entry
                  </button>
@@ -1342,6 +1544,8 @@ const App: React.FC = () => {
                 <Route path="/gallery" element={<GalleryPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsConditionsPage />} />
             </Route>
 
             <Route path="/portal/parent" element={(userRole === 'parent' && currentUser) ? <PortalLayout role="parent" /> : <Navigate to="/login" />}>
@@ -1349,6 +1553,7 @@ const App: React.FC = () => {
                 <Route path="dashboard" element={<ParentDashboard student={currentUser as Student} />} />
                 <Route path="syllabus" element={<SyllabusView />} />
                 <Route path="logs" element={<LogsView student={currentUser as Student} />} />
+                <Route path="gallery" element={<PortalGalleryPage role="parent" studentId={currentUser?.id} />} />
                 <Route path="messages" element={<ChatPage currentUser={currentUser!} role="parent" />} />
                 <Route path="messages/:chatId" element={<ChatPage currentUser={currentUser!} role="parent" />} />
                 <Route path="profile" element={<ProfileView user={currentUser!} role="parent" onLogout={handleLogout} onUpdate={handleUserUpdate} />} />
@@ -1359,6 +1564,7 @@ const App: React.FC = () => {
                 <Route path="teacher-home" element={<TeacherDashboard teacher={currentUser as Teacher} />} />
                 <Route path="students" element={<TeacherStudentList teacherId={currentUser?.id || ''} />} />
                 <Route path="students/:id" element={<StudentDetailsPage />} />
+                <Route path="gallery" element={<PortalGalleryPage role="teacher" />} />
                 <Route path="messages" element={<ChatPage currentUser={currentUser!} role="teacher" />} />
                 <Route path="messages/:chatId" element={<ChatPage currentUser={currentUser!} role="teacher" />} />
                 <Route path="add-log" element={<TeacherAddLog />} />

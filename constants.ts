@@ -3,12 +3,12 @@
 import { ClassLevel, SyllabusItem, GalleryItem } from "./types";
 
 export const GALLERY_IMAGES: GalleryItem[] = [
-  { url: "https://picsum.photos/id/1015/800/600", title: "Valley Sunset", date: "May 2024" },
-  { url: "https://picsum.photos/id/1016/800/600", title: "Canyon Echoes", date: "April 2024" },
-  { url: "https://picsum.photos/id/1018/800/600", title: "Mountain High", date: "March 2024" },
-  { url: "https://picsum.photos/id/1019/800/600", title: "Ocean Breeze", date: "June 2024" },
-  { url: "https://picsum.photos/id/1025/800/600", title: "Winter Solstice", date: "December 2023" },
-  { url: "https://picsum.photos/id/1040/800/600", title: "Castle Dreams", date: "February 2024" },
+  { url: "../../assets/show1.png", title: "Pikachu", date: "2024-01-15" },
+  { url: "../../assets/show2.png", title: "Vincent Van Gogh", date: "2024-02-20" },
+  { url: "../../assets/show3.png", title: "Himalayas", date: "2024-03-10" },
+  { url: "../../assets/child1.jpeg", title: "Sweet Tooth", date: "2024-04-05" },
+  { url: "../../assets/child2.jpeg", title: "Prism Feather", date: "2024-05-12" },
+  { url: "../../assets/child3.jpeg", title: "After Hours", date: "2024-06-18" }
 ];
 
 export const TESTIMONIALS = [

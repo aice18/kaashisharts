@@ -1,8 +1,9 @@
 
 
 import React, { useState } from 'react';
-import { DailyLog } from '../types';
+import { DailyLog, Student } from '../types';
 import { Lightbox } from './Lightbox';
+import { Database } from '../services/database';
 
 interface DailyLogCardProps {
   log: DailyLog;
@@ -29,6 +30,12 @@ export const DailyLogCard: React.FC<DailyLogCardProps> = ({ log }) => {
   const borderColor = getBorderColor(log.id);
   const textColor = getTextColor(log.id);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+
+  const attendees = log.studentIds.map(id => {
+      const student = Database.getStudentById(id);
+      const attendanceCount = Database.getLogsForStudent(id).length;
+      return { student, attendanceCount };
+  }).filter(item => item.student !== undefined) as { student: Student, attendanceCount: number }[];
 
   return (
     <>
@@ -84,6 +91,28 @@ export const DailyLogCard: React.FC<DailyLogCardProps> = ({ log }) => {
                      <p className="font-serif text-lg">{log.exitTime}</p>
                 </div>
             </div>
+
+            {/* Attendance Section */}
+            {attendees.length > 0 && (
+                <div className="pt-4 border-t border-primary/5">
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-secondary block mb-3">Attendance</span>
+                    <div className="flex flex-wrap gap-3">
+                        {attendees.map(({ student, attendanceCount }) => (
+                            <div key={student.id} className="flex items-center gap-2 bg-subtle/30 pr-3 rounded-full border border-primary/5 relative overflow-hidden group">
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500"></div>
+                                <img src={student.profileImage} alt={student.name} className="w-8 h-8 rounded-full object-cover ml-2" />
+                                <div>
+                                    <p className="text-xs font-medium text-primary flex items-center gap-1">
+                                        {student.name.split(' ')[0]}
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" title="Present"></span>
+                                    </p>
+                                    <p className="text-[9px] text-secondary">{attendanceCount} Classes</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             
              <div className="bg-background p-6 mt-2 border border-primary/5">
                 <span className="text-[9px] uppercase tracking-[0.2em] text-secondary block mb-2">Independent Study</span>

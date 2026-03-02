@@ -29,6 +29,10 @@ export interface DirectMessage {
   content: string;
   timestamp: string; // ISO string
   read: boolean;
+  attachment?: {
+    type: 'image' | 'video';
+    url: string;
+  };
 }
 
 export interface ClassSchedule {
