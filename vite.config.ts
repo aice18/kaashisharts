@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      allowedHosts: ['kasharts.onrender.com']
+      allowedHosts: ['kasharts.onrender.com','kasharts-t07r.onrender.com"]
     },
 
     plugins: [react()],
