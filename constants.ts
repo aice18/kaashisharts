@@ -3,8 +3,8 @@
 import { ClassLevel, SyllabusItem, GalleryItem } from "./types";
 
 export const GALLERY_IMAGES: GalleryItem[] = [
-  { url: "../../assets/show1.png", title: "Pikachu", date: "2024-01-15" },
-  { url: "../../assets/show2.png", title: "Vincent Van Gogh", date: "2024-02-20" },
+  { url: "../assets/show1.png", title: "Pikachu", date: "2024-01-15" },
+  { url: "../assets/show2.png", title: "Vincent Van Gogh", date: "2024-02-20" },
   { url: "../../assets/show3.png", title: "Himalayas", date: "2024-03-10" },
   { url: "../../assets/child1.jpeg", title: "Sweet Tooth", date: "2024-04-05" },
   { url: "../../assets/child2.jpeg", title: "Prism Feather", date: "2024-05-12" },
